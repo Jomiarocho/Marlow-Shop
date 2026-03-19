@@ -404,7 +404,7 @@ function changeQty(id, d) { cart[id]=(cart[id]||0)+d; if(cart[id]<=0) delete car
 function removeItem(id) { delete cart[id]; updateCartUI(); }
 function openCart() { document.getElementById('cartSidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); updateCartUI(); }
 function closeCart() { document.getElementById('cartSidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
-function openOrders() { renderOrders(); document.getElementById('ordersPanel').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function openOrders() { const pwd = prompt('Enter your store password:'); if (pwd !== 'Colegio0401@') { alert('Incorrect password.'); return; } renderOrders(); document.getElementById('ordersPanel').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
 function closeOrders() { document.getElementById('ordersPanel').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
 function closeAll() { closeCart(); closeOrders(); }
 
