@@ -484,16 +484,11 @@ function openCheckout(method) {
     </div>
     ${method==='stripe' ? `
       <h3>Card Details</h3>
-      <div class="form-group"><label>Card Number</label><input id="f-card" placeholder="4242 4242 4242 4242" maxlength="19"/></div>
-      <div class="form-row">
-        <div class="form-group"><label>Expiry</label><input placeholder="MM / YY" maxlength="7"/></div>
-        <div class="form-group"><label>CVC</label><input placeholder="123" maxlength="3"/></div>
-      </div>
-      <button class="pay-btn pay-stripe" onclick="placeOrder(${total})">💳 Pay $${total.toFixed(2)}</button>
+      <div class="form-group"><label>Card Number</label><div id="stripe-card-element" style="padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--card)"></div></div>
+      <div id="stripe-error" style="color:#e05555;font-size:0.82rem;margin-top:0.25rem;display:none"></div>
+      <button class="pay-btn pay-stripe" id="stripe-pay-btn" onclick="stripePayNow(${total})">💳 Pay $${total.toFixed(2)}</button>
     ` : `
-      <button class="pay-btn pay-paypal" onclick="placeOrder(${total})">
-        <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" height="16" alt="PayPal" style="vertical-align:middle;margin-right:6px"/>Pay $${total.toFixed(2)} with PayPal
-      </button>
+      <div id="paypal-button-container" style="margin-top:0.5rem"></div>
     `}
     <div class="secure-note" style="margin-top:1rem">🔒 Encrypted & secure checkout</div>
   `;
@@ -538,6 +533,92 @@ function showToast(msg) {
 }
 
 renderProducts();
+
+// ── STRIPE ──────────────────────────────────────────────
+const STRIPE_PK = 'pk_live_51TClkMC2KcEF79brcTOFtvK8wUfd6XD0UMfsjROAsEiTuFEDLSk8B6uUvo5z3ys3189af3QpewxRtmxlH3dxrKWL00mEMPNvbf';
+let stripe, stripeElements, stripeCard;
+
+function loadStripe() {
+  return new Promise(res => {
+    if (window.Stripe) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://js.stripe.com/v3/';
+    s.onload = res;
+    document.head.appendChild(s);
+  });
+}
+
+async function initStripeCard() {
+  await loadStripe();
+  stripe = Stripe(STRIPE_PK);
+  stripeElements = stripe.elements();
+  stripeCard = stripeElements.create('card', {
+    style: {
+      base: { color: '#f0ece4', fontFamily: 'DM Sans, sans-serif', fontSize: '15px', '::placeholder': { color: '#8a8070' } },
+      invalid: { color: '#e05555' }
+    }
+  });
+  stripeCard.mount('#stripe-card-element');
+  stripeCard.on('change', e => {
+    const err = document.getElementById('stripe-error');
+    if (e.error) { err.textContent = e.error.message; err.style.display='block'; }
+    else { err.style.display='none'; }
+  });
+}
+
+// Call initStripeCard when stripe modal opens
+const _origOpenCheckout = openCheckout;
+window.openCheckout = function(method) {
+  _origOpenCheckout(method);
+  if (method === 'stripe') setTimeout(initStripeCard, 100);
+  if (method === 'paypal') setTimeout(initPayPalButtons, 100);
+}
+
+async function stripePayNow(total) {
+  const btn = document.getElementById('stripe-pay-btn');
+  btn.textContent = 'Processing...'; btn.disabled = true;
+  const {paymentMethod, error} = await stripe.createPaymentMethod({ type:'card', card: stripeCard });
+  if (error) {
+    const err = document.getElementById('stripe-error');
+    err.textContent = error.message; err.style.display='block';
+    btn.textContent = `💳 Pay $${total.toFixed(2)}`; btn.disabled=false;
+    return;
+  }
+  // Payment method created — in production send paymentMethod.id to your server
+  // For now, record the order locally
+  placeOrder(total);
+}
+
+// ── PAYPAL ──────────────────────────────────────────────
+const PAYPAL_CLIENT_ID = 'PAYPAL_CLIENT_ID_PLACEHOLDER';
+
+function loadPayPalSDK(total) {
+  return new Promise(res => {
+    const existing = document.getElementById('paypal-sdk');
+    if (existing) existing.remove();
+    const s = document.createElement('script');
+    s.id = 'paypal-sdk';
+    s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+    s.onload = res;
+    document.head.appendChild(s);
+  });
+}
+
+async function initPayPalButtons() {
+  const keys = Object.keys(cart).filter(k=>cart[k]>0);
+  let total = 0;
+  keys.forEach(id=>{ const p=PRODUCTS.find(x=>x.id==id); total+=p.price*cart[id]; });
+  await loadPayPalSDK(total);
+  if (!window.paypal) return;
+  const container = document.getElementById('paypal-button-container');
+  if (!container) return;
+  container.innerHTML = '';
+  paypal.Buttons({
+    createOrder: (data, actions) => actions.order.create({ purchase_units:[{ amount:{ value: total.toFixed(2) } }] }),
+    onApprove: (data, actions) => actions.order.capture().then(() => placeOrder(total)),
+    onError: err => alert('PayPal error. Please try again.')
+  }).render('#paypal-button-container');
+}
 </script>
 </body>
 </html>
