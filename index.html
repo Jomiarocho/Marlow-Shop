@@ -265,13 +265,13 @@
 <section class="hero">
   <div class="hero-tag">🔥 Trending Picks 2026</div>
   <h1>Products people <span>actually want</span><br/>at prices they'll love.</h1>
-  <p>Curated from AliExpress bestsellers · Dropship with zero inventory</p>
+  <p>Curated goods · Free shipping · Fast delivery</p>
   <button class="hero-cta" onclick="document.querySelector('.section-header').scrollIntoView({behavior:'smooth'})">Shop Now ↓</button>
 </section>
 
 <div class="section-header">
-  <h2>Top Dropshipping Products</h2>
-  <p>You sell · AliExpress ships · You keep the profit margin</p>
+  <h2>Featured Products</h2>
+  <p>Hand-picked items delivered straight to your door</p>
 </div>
 
 <div class="products-grid" id="productsGrid"></div>
@@ -308,7 +308,7 @@
 
 <div class="toast" id="toast"></div>
 
-<footer>© 2026 <span>Marlowe Shop</span> · AliExpress Dropshipping Store</footer>
+<footer>© 2026 <span>Marlowe Shop</span> · All rights reserved</footer>
 
 <script>
 const PRODUCTS = [
@@ -355,10 +355,7 @@ function renderProducts() {
       <div class="product-info">
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${p.desc}</div>
-        <div class="product-meta">
-          <span class="product-cost">Cost ~$${p.cost.toFixed(2)}</span>
-          <span class="product-profit">+$${profit(p)} profit (${margin(p)}%)</span>
-        </div>
+
         <div class="product-footer">
           <span class="product-price">$${p.price.toFixed(2)}</span>
           <button class="add-btn" onclick="addToCart(${p.id})">Add to Cart</button>
@@ -414,7 +411,7 @@ function closeAll() { closeCart(); closeOrders(); }
 function renderOrders() {
   const el = document.getElementById('ordersBody');
   if (!orders.length) {
-    el.innerHTML = '<div class="orders-empty">No orders yet.<br/><br/>When a customer checks out,<br/>their order appears here with<br/>direct AliExpress links to fulfill it.</div>';
+    el.innerHTML = '<div class="orders-empty">No orders yet.<br/><br/>When a customer checks out,<br/>their order appears here with<br/>links to fulfill each order.</div>';
     return;
   }
   el.innerHTML = [...orders].reverse().map(o => `
@@ -435,7 +432,7 @@ function renderOrders() {
           ${o.items.map(i => {
             const prod = PRODUCTS.find(p=>p.id===i.id);
             return `<a href="${prod.aliUrl}" target="_blank" style="text-decoration:none">
-              <div class="fulfill-btn">🛒 Buy "${i.name}" on AliExpress (~$${prod.cost.toFixed(2)})</div>
+              <div class="fulfill-btn">🛒 Order "${i.name}" from supplier</div>
             </a>`;
           }).join('')}
           <button class="mark-btn" onclick="markFulfilled(${o.id})">✓ Mark as Fulfilled</button>
@@ -518,7 +515,7 @@ function placeOrder(total) {
       <div class="check">✅</div>
       <h2>Order Placed!</h2>
       <p>Order <strong>#${order.id}</strong> is ready to fulfill.<br/><br/>
-      Open <strong>My Orders</strong> to see direct AliExpress links — buy the item there, enter your customer's address, and AliExpress ships it directly to them.</p>
+      Open <strong>My Orders</strong> to manage and fulfill this order.</p>
       <button onclick="closeModal(); openOrders()">View Orders →</button>
     </div>
   `;
