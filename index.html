@@ -436,13 +436,36 @@ function renderOrders() {
             </a>`;
           }).join('')}
           <button class="mark-btn" onclick="markFulfilled(${o.id})">✓ Mark as Fulfilled</button>
+          <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
+            <input id="tracking-${o.id}" placeholder="Paste tracking number..." style="flex:1;padding:0.5rem 0.75rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;outline:none"/>
+            <button onclick="sendTracking(${o.id})" data-email="${o.email}" data-name="${o.name}" id="trackbtn-${o.id}" style="padding:0.5rem 0.75rem;background:var(--accent);color:var(--bg);border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer">📧 Send</button>
+          </div>
         </div>
       ` : '<div style="text-align:center;color:#5ecc7b;font-size:0.82rem;padding-top:0.25rem">✅ Fulfilled — shipped to customer</div>'}
     </div>
   `).join('');
 }
 
-function markFulfilled(id) {
+function sendTracking(orderId) {
+  const btn = document.getElementById(`trackbtn-${orderId}`);
+  const email = btn.getAttribute('data-email');
+  const name = btn.getAttribute('data-name');
+  const tracking = document.getElementById(`tracking-${orderId}`)?.value?.trim();
+  if (!tracking) { alert('Please paste a tracking number first.'); return; }
+  loadEmailJS().then(() => {
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      customer_name: name,
+      order_id: orderId,
+      items: 'Your order',
+      total: '',
+      address: `Track your order at: https://www.17track.net/en/track?nums=${tracking}`,
+      to_email: email
+    }).then(() => {
+      showToast('Tracking info sent to customer! 📧');
+      markFulfilled(orderId);
+    }).catch(() => alert('Failed to send email. Check your EmailJS settings.'));
+  });
+}
   const o = orders.find(x=>x.id===id);
   if(o){ o.fulfilled=true; renderOrders(); showToast('Marked as fulfilled! ✅'); }
 }
@@ -492,6 +515,21 @@ function openCheckout(method) {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
+// ── EMAILJS ─────────────────────────────────────────────
+const EMAILJS_SERVICE_ID  = 'service_pisdlyr';
+const EMAILJS_TEMPLATE_ID = 'template_8kwjjiw';
+const EMAILJS_PUBLIC_KEY  = '8U0ViwHJz1gZ7QVh_';
+
+function loadEmailJS() {
+  return new Promise(res => {
+    if (window.emailjs) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js';
+    s.onload = () => { emailjs.init(EMAILJS_PUBLIC_KEY); res(); };
+    document.head.appendChild(s);
+  });
+}
+
 function placeOrder(total) {
   const first = document.getElementById('f-first')?.value||'Customer';
   const last = document.getElementById('f-last')?.value||'';
@@ -510,13 +548,27 @@ function placeOrder(total) {
   cart = {};
   document.getElementById('cartCount').textContent = '0';
 
+  // Send confirmation email to customer
+  loadEmailJS().then(() => {
+    const itemsList = order.items.map(i => `${i.name} x${i.qty} — $${(i.price*i.qty).toFixed(2)}`).join('\n');
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      customer_name: order.name,
+      order_id: order.id,
+      items: itemsList,
+      total: order.total.toFixed(2),
+      address: `${order.address}, ${order.city} ${order.zip}`,
+      to_email: order.email
+    }).catch(err => console.log('Email error:', err));
+  });
+
   document.getElementById('checkoutModal').innerHTML = `
     <div class="success-screen">
       <div class="check">✅</div>
       <h2>Order Placed!</h2>
-      <p>Order <strong>#${order.id}</strong> is ready to fulfill.<br/><br/>
-      Open <strong>My Orders</strong> to manage and fulfill this order.</p>
-      <button onclick="closeModal(); openOrders()">View Orders →</button>
+      <p>Order <strong>#${order.id}</strong> is confirmed!<br/><br/>
+      A confirmation email has been sent to <strong>${order.email}</strong>.<br/>
+      You'll receive tracking info once your order ships.</p>
+      <button onclick="closeModal()">Continue Shopping</button>
     </div>
   `;
 }
