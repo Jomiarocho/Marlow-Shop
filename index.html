@@ -314,37 +314,42 @@
 const PRODUCTS = [
   { id:1, name:'Wireless Earbuds Pro', price:34.99, cost:8.50, emoji:'🎧', badge:'Best Seller',
     desc:'Bluetooth 5.3, 30hr battery, active noise cancellation. Ships in 7–12 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=wireless+earbuds+bluetooth+5.3+noise+cancellation' },
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=wireless+earbuds+bluetooth+5.3' },
   { id:2, name:'LED Car Headlights (Pair)', price:42.99, cost:11.00, emoji:'💡', badge:'Trending',
     desc:'H4/H7 universal fit, 6000K white daylight, plug-and-play. Ships in 8–14 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=LED+car+headlight+bulb+H4+H7+6000K' },
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=LED+car+headlight+H4+H7' },
   { id:3, name:'Smart Sleep Mask', price:39.99, cost:10.00, emoji:'😴', badge:'Hot',
     desc:'Built-in Bluetooth speaker, sleep sounds, light blocking. Ships in 7–12 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=smart+sleep+mask+bluetooth+speaker' },
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=smart+sleep+mask+bluetooth' },
   { id:4, name:'Multi-Function Kitchen Chopper', price:24.99, cost:6.00, emoji:'🔪', badge:'Top Rated',
     desc:'Chops, slices, peels — 6 attachments. Saves drawer space. Ships in 7–10 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=multi+function+kitchen+chopper+vegetable+slicer' },
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=kitchen+chopper+multi+function' },
   { id:5, name:'Personalized Name Necklace', price:19.99, cost:4.50, emoji:'📿', badge:'Gift Fave',
     desc:'Sterling silver plated, custom engraved. Perfect gift item. Ships in 8–14 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=custom+name+necklace+personalized+silver' },
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=custom+name+necklace+silver' },
   { id:6, name:'Portable Mini Blender', price:27.99, cost:7.00, emoji:'🥤', badge:'Trending',
     desc:'USB rechargeable, 380ml BPA-free cup. Great for smoothies on the go. Ships 7–12 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=portable+mini+blender+USB+rechargeable+380ml' },
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=portable+mini+blender+USB' },
   { id:7, name:'Plush Phone Holder Pillow', price:21.99, cost:5.00, emoji:'🛋️', badge:'Viral',
-    desc:'Hands-free couch companion, fits all phones. Viral on TikTok. Ships 7–12 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=plush+pillow+phone+holder+lazy+stand' },
+    desc:'Hands-free couch companion, fits all phones. Ships 7–12 days.',
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=plush+pillow+phone+holder' },
   { id:8, name:'Auto-Clamp Car Phone Mount', price:22.99, cost:5.50, emoji:'📱', badge:'Top Seller',
     desc:'Wireless charging 15W, auto-clamping, 360° rotation. Ships in 7–12 days.',
-    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=wireless+charging+car+phone+mount+auto+clamp+15W' }
+    aliUrl:'https://www.aliexpress.com/wholesale?SearchText=wireless+car+phone+mount+15W' }
 ];
+
+const EMAILJS_SERVICE_ID  = 'service_pisdlyr';
+const EMAILJS_TEMPLATE_ID = 'template_8kwjjiw';
+const EMAILJS_PUBLIC_KEY  = '8U0ViwHJz1gZ7QVh_';
+const STRIPE_PK = 'pk_live_51TClkMC2KcEF79brcTOFtvK8wUfd6XD0UMfsjROAsEiTuFEDLSk8B6uUvo5z3ys3189af3QpewxRtmxlH3dxrKWL00mEMPNvbf';
+const PAYPAL_CLIENT_ID = 'AR_t2-OV-UPOR-HWphxpKShqAiJkt35gOIKmmDpp82Bq8klOJtiOoDKLoHtdHkfrXTlsWAjJtsBSVUs3';
 
 let cart = {};
 let orders = [];
 let orderCounter = 1000;
+let stripe, stripeElements, stripeCard;
 
-const profit = p => (p.price - p.cost).toFixed(2);
-const margin = p => Math.round(((p.price - p.cost) / p.price) * 100);
-
+// ── RENDER PRODUCTS ──────────────────────────────────────
 function renderProducts() {
   document.getElementById('productsGrid').innerHTML = PRODUCTS.map(p => `
     <div class="product-card">
@@ -355,7 +360,6 @@ function renderProducts() {
       <div class="product-info">
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${p.desc}</div>
-
         <div class="product-footer">
           <span class="product-price">$${p.price.toFixed(2)}</span>
           <button class="add-btn" onclick="addToCart(${p.id})">Add to Cart</button>
@@ -365,6 +369,7 @@ function renderProducts() {
   `).join('');
 }
 
+// ── CART ─────────────────────────────────────────────────
 function addToCart(id) {
   cart[id] = (cart[id] || 0) + 1;
   updateCartUI();
@@ -376,8 +381,12 @@ function updateCartUI() {
   document.getElementById('cartCount').textContent = total;
   const keys = Object.keys(cart).filter(k => cart[k] > 0);
   const itemsEl = document.getElementById('cartItems');
-  const footEl = document.getElementById('cartFoot');
-  if (!keys.length) { itemsEl.innerHTML = '<div class="cart-empty">Your cart is empty</div>'; footEl.style.display='none'; return; }
+  const footEl  = document.getElementById('cartFoot');
+  if (!keys.length) {
+    itemsEl.innerHTML = '<div class="cart-empty">Your cart is empty</div>';
+    footEl.style.display = 'none';
+    return;
+  }
   footEl.style.display = 'block';
   let subtotal = 0;
   itemsEl.innerHTML = keys.map(id => {
@@ -400,86 +409,110 @@ function updateCartUI() {
   document.getElementById('cartTotal').textContent = '$' + subtotal.toFixed(2);
 }
 
-function changeQty(id, d) { cart[id]=(cart[id]||0)+d; if(cart[id]<=0) delete cart[id]; updateCartUI(); }
-function removeItem(id) { delete cart[id]; updateCartUI(); }
-function openCart() { document.getElementById('cartSidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); updateCartUI(); }
+function changeQty(id, d) { cart[id] = (cart[id]||0)+d; if (cart[id]<=0) delete cart[id]; updateCartUI(); }
+function removeItem(id)    { delete cart[id]; updateCartUI(); }
+function openCart()  { document.getElementById('cartSidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); updateCartUI(); }
 function closeCart() { document.getElementById('cartSidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
-function openOrders() { const pwd = prompt('Enter your store password:'); if (pwd !== 'Colegio0401@') { alert('Incorrect password.'); return; } renderOrders(); document.getElementById('ordersPanel').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
-function closeOrders() { document.getElementById('ordersPanel').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
-function closeAll() { closeCart(); closeOrders(); }
+function closeAll()  { closeCart(); closeOrders(); }
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+
+// ── ORDERS ───────────────────────────────────────────────
+function openOrders() {
+  const pwd = prompt('Enter your store password:');
+  if (pwd !== 'Colegio0401@') { alert('Incorrect password.'); return; }
+  renderOrders();
+  document.getElementById('ordersPanel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+function closeOrders() {
+  document.getElementById('ordersPanel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
 
 function renderOrders() {
   const el = document.getElementById('ordersBody');
   if (!orders.length) {
-    el.innerHTML = '<div class="orders-empty">No orders yet.<br/><br/>When a customer checks out,<br/>their order appears here with<br/>links to fulfill each order.</div>';
+    el.innerHTML = '<div class="orders-empty">No orders yet.<br/><br/>When a customer checks out,<br/>their order appears here.</div>';
     return;
   }
-  el.innerHTML = [...orders].reverse().map(o => `
-    <div class="order-card" id="ocard-${o.id}">
+  el.innerHTML = [...orders].reverse().map(o => {
+    const itemsHtml = o.items.map(i => {
+      const prod = PRODUCTS.find(p => p.id === i.id);
+      return `<a href="${prod.aliUrl}" target="_blank" style="text-decoration:none">
+        <div class="fulfill-btn">🛒 Order "${i.name}" from supplier</div>
+      </a>`;
+    }).join('');
+
+    const trackingHtml = !o.fulfilled ? `
+      <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
+        <input id="tracking-${o.id}" placeholder="Paste tracking number..." style="flex:1;padding:0.5rem 0.75rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;outline:none"/>
+        <button id="trackbtn-${o.id}" onclick="sendTracking(${o.id})" style="padding:0.5rem 0.75rem;background:var(--accent);color:var(--bg);border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer">📧 Send</button>
+      </div>` : '';
+
+    return `<div class="order-card" id="ocard-${o.id}">
       <div class="order-card-header">
         <span class="order-id">#${o.id}</span>
         <span class="order-status ${o.fulfilled ? 'status-fulfilled' : 'status-new'}">${o.fulfilled ? '✓ Fulfilled' : '● New Order'}</span>
       </div>
-      <div class="order-meta">👤 ${o.name} &nbsp;·&nbsp; ${o.email}</div>
+      <div class="order-meta">👤 ${o.name} · ${o.email}</div>
       <div class="order-meta">📍 ${o.address}, ${o.city} ${o.zip}</div>
-      <div class="order-items-list">${o.items.map(i=>`${i.emoji} ${i.name} ×${i.qty} — $${(i.price*i.qty).toFixed(2)}`).join('<br/>')}</div>
-      <div class="order-profit-line">
-        Collected: <strong>$${o.total.toFixed(2)}</strong> &nbsp;·&nbsp;
-        <span style="color:#5ecc7b">Your profit: ~$${o.profit.toFixed(2)}</span>
-      </div>
-      ${!o.fulfilled ? `
-        <div>
-          ${o.items.map(i => {
-            const prod = PRODUCTS.find(p=>p.id===i.id);
-            return `<a href="${prod.aliUrl}" target="_blank" style="text-decoration:none">
-              <div class="fulfill-btn">🛒 Order "${i.name}" from supplier</div>
-            </a>`;
-          }).join('')}
-          <button class="mark-btn" onclick="markFulfilled(${o.id})">✓ Mark as Fulfilled</button>
-          <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
-            <input id="tracking-${o.id}" placeholder="Paste tracking number..." style="flex:1;padding:0.5rem 0.75rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.82rem;outline:none"/>
-            <button onclick="sendTracking(${o.id})" data-email="${o.email}" data-name="${o.name}" id="trackbtn-${o.id}" style="padding:0.5rem 0.75rem;background:var(--accent);color:var(--bg);border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer">📧 Send</button>
-          </div>
-        </div>
-      ` : '<div style="text-align:center;color:#5ecc7b;font-size:0.82rem;padding-top:0.25rem">✅ Fulfilled — shipped to customer</div>'}
-    </div>
-  `).join('');
+      <div class="order-items-list">${o.items.map(i => `${i.emoji} ${i.name} ×${i.qty} — $${(i.price*i.qty).toFixed(2)}`).join('<br/>')}</div>
+      <div class="order-profit-line">Collected: <strong>$${o.total.toFixed(2)}</strong> &nbsp;·&nbsp; <span style="color:#5ecc7b">Profit: ~$${o.profit.toFixed(2)}</span></div>
+      ${!o.fulfilled ? `<div>${itemsHtml}
+        <button class="mark-btn" onclick="markFulfilled(${o.id})">✓ Mark as Fulfilled</button>
+        ${trackingHtml}
+      </div>` : '<div style="text-align:center;color:#5ecc7b;font-size:0.82rem;padding-top:0.25rem">✅ Fulfilled — shipped to customer</div>'}
+    </div>`;
+  }).join('');
+}
+
+function markFulfilled(id) {
+  const o = orders.find(x => x.id === id);
+  if (o) { o.fulfilled = true; renderOrders(); showToast('Marked as fulfilled! ✅'); }
 }
 
 function sendTracking(orderId) {
-  const btn = document.getElementById(`trackbtn-${orderId}`);
-  const email = btn.getAttribute('data-email');
-  const name = btn.getAttribute('data-name');
-  const tracking = document.getElementById(`tracking-${orderId}`)?.value?.trim();
+  const trackInput = document.getElementById('tracking-' + orderId);
+  const tracking = trackInput ? trackInput.value.trim() : '';
   if (!tracking) { alert('Please paste a tracking number first.'); return; }
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return;
   loadEmailJS().then(() => {
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      customer_name: name,
-      order_id: orderId,
-      items: 'Your order',
-      total: '',
-      address: `Track your order at: https://www.17track.net/en/track?nums=${tracking}`,
-      to_email: email
+      customer_name: o.name,
+      order_id: o.id,
+      items: 'Your recent order',
+      total: o.total.toFixed(2),
+      address: 'Track at: https://www.17track.net/en/track?nums=' + tracking,
+      to_email: o.email
     }).then(() => {
-      showToast('Tracking info sent to customer! 📧');
+      showToast('Tracking sent to customer! 📧');
       markFulfilled(orderId);
-    }).catch(() => alert('Failed to send email. Check your EmailJS settings.'));
+    }).catch(() => alert('Email failed. Check EmailJS settings.'));
   });
 }
-  const o = orders.find(x=>x.id===id);
-  if(o){ o.fulfilled=true; renderOrders(); showToast('Marked as fulfilled! ✅'); }
-}
 
+// ── CHECKOUT ─────────────────────────────────────────────
 function openCheckout(method) {
   closeCart();
-  const keys = Object.keys(cart).filter(k=>cart[k]>0);
+  const keys = Object.keys(cart).filter(k => cart[k] > 0);
   let subtotal = 0;
-  let itemsHtml = keys.map(id => {
-    const p = PRODUCTS.find(x=>x.id==id);
-    const line = p.price*cart[id]; subtotal+=line;
+  const itemsHtml = keys.map(id => {
+    const p = PRODUCTS.find(x => x.id == id);
+    const line = p.price * cart[id];
+    subtotal += line;
     return `<div class="summary-row"><span>${p.emoji} ${p.name} ×${cart[id]}</span><span>$${line.toFixed(2)}</span></div>`;
   }).join('');
   const total = subtotal;
+
+  const cardSection = method === 'stripe' ? `
+    <h3>Card Details</h3>
+    <div class="form-group"><label>Card</label>
+      <div id="stripe-card-element" style="padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--card)"></div>
+    </div>
+    <div id="stripe-error" style="color:#e05555;font-size:0.82rem;margin-top:0.25rem;display:none"></div>
+    <button class="pay-btn pay-stripe" id="stripe-pay-btn" onclick="stripePayNow(${total})">💳 Pay $${total.toFixed(2)}</button>
+  ` : `<div id="paypal-button-container" style="margin-top:0.5rem"></div>`;
 
   document.getElementById('checkoutModal').innerHTML = `
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -502,24 +535,61 @@ function openCheckout(method) {
       <div class="form-group"><label>City</label><input id="f-city" placeholder="New York"/></div>
       <div class="form-group"><label>ZIP</label><input id="f-zip" placeholder="10001"/></div>
     </div>
-    ${method==='stripe' ? `
-      <h3>Card Details</h3>
-      <div class="form-group"><label>Card Number</label><div id="stripe-card-element" style="padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--card)"></div></div>
-      <div id="stripe-error" style="color:#e05555;font-size:0.82rem;margin-top:0.25rem;display:none"></div>
-      <button class="pay-btn pay-stripe" id="stripe-pay-btn" onclick="stripePayNow(${total})">💳 Pay $${total.toFixed(2)}</button>
-    ` : `
-      <div id="paypal-button-container" style="margin-top:0.5rem"></div>
-    `}
+    ${cardSection}
     <div class="secure-note" style="margin-top:1rem">🔒 Encrypted & secure checkout</div>
   `;
   document.getElementById('modalOverlay').classList.add('open');
+  if (method === 'stripe') setTimeout(initStripeCard, 100);
+  if (method === 'paypal') setTimeout(initPayPalButtons, 100);
 }
 
-// ── EMAILJS ─────────────────────────────────────────────
-const EMAILJS_SERVICE_ID  = 'service_pisdlyr';
-const EMAILJS_TEMPLATE_ID = 'template_8kwjjiw';
-const EMAILJS_PUBLIC_KEY  = '8U0ViwHJz1gZ7QVh_';
+// ── PLACE ORDER ──────────────────────────────────────────
+function placeOrder(total) {
+  const first = document.getElementById('f-first')?.value || 'Customer';
+  const last  = document.getElementById('f-last')?.value  || '';
+  const email = document.getElementById('f-email')?.value || 'customer@email.com';
+  const addr  = document.getElementById('f-addr')?.value  || '123 Main St';
+  const city  = document.getElementById('f-city')?.value  || 'New York';
+  const zip   = document.getElementById('f-zip')?.value   || '10001';
 
+  const keys = Object.keys(cart).filter(k => cart[k] > 0);
+  const items = keys.map(id => {
+    const p = PRODUCTS.find(x => x.id == id);
+    return { id: p.id, name: p.name, emoji: p.emoji, price: p.price, qty: cart[id] };
+  });
+  let totalProfit = 0;
+  keys.forEach(id => { const p = PRODUCTS.find(x => x.id == id); totalProfit += (p.price - p.cost) * cart[id]; });
+
+  const order = { id: ++orderCounter, name: (first + ' ' + last).trim(), email, address: addr, city, zip, items, total, profit: totalProfit, fulfilled: false };
+  orders.push(order);
+  cart = {};
+  document.getElementById('cartCount').textContent = '0';
+
+  loadEmailJS().then(() => {
+    const itemsList = order.items.map(i => i.name + ' x' + i.qty + ' — $' + (i.price * i.qty).toFixed(2)).join(', ');
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      customer_name: order.name,
+      order_id: order.id,
+      items: itemsList,
+      total: order.total.toFixed(2),
+      address: order.address + ', ' + order.city + ' ' + order.zip,
+      to_email: order.email
+    }).catch(err => console.log('Email error:', err));
+  });
+
+  document.getElementById('checkoutModal').innerHTML = `
+    <div class="success-screen">
+      <div class="check">✅</div>
+      <h2>Order Placed!</h2>
+      <p>Order <strong>#${order.id}</strong> confirmed!<br/><br/>
+      A confirmation email has been sent to <strong>${order.email}</strong>.<br/>
+      You will receive tracking info once your order ships.</p>
+      <button onclick="closeModal()">Continue Shopping</button>
+    </div>
+  `;
+}
+
+// ── EMAILJS ──────────────────────────────────────────────
 function loadEmailJS() {
   return new Promise(res => {
     if (window.emailjs) { res(); return; }
@@ -530,63 +600,7 @@ function loadEmailJS() {
   });
 }
 
-function placeOrder(total) {
-  const first = document.getElementById('f-first')?.value||'Customer';
-  const last = document.getElementById('f-last')?.value||'';
-  const email = document.getElementById('f-email')?.value||'customer@email.com';
-  const addr = document.getElementById('f-addr')?.value||'123 Main St';
-  const city = document.getElementById('f-city')?.value||'New York';
-  const zip = document.getElementById('f-zip')?.value||'10001';
-
-  const keys = Object.keys(cart).filter(k=>cart[k]>0);
-  const items = keys.map(id=>{ const p=PRODUCTS.find(x=>x.id==id); return {id:p.id,name:p.name,emoji:p.emoji,price:p.price,qty:cart[id]}; });
-  let totalProfit = 0;
-  keys.forEach(id=>{ const p=PRODUCTS.find(x=>x.id==id); totalProfit+=(p.price-p.cost)*cart[id]; });
-
-  const order = { id:++orderCounter, name:`${first} ${last}`.trim(), email, address:addr, city, zip, items, total, profit:totalProfit, fulfilled:false };
-  orders.push(order);
-  cart = {};
-  document.getElementById('cartCount').textContent = '0';
-
-  // Send confirmation email to customer
-  loadEmailJS().then(() => {
-    const itemsList = order.items.map(i => `${i.name} x${i.qty} — $${(i.price*i.qty).toFixed(2)}`).join('\n');
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      customer_name: order.name,
-      order_id: order.id,
-      items: itemsList,
-      total: order.total.toFixed(2),
-      address: `${order.address}, ${order.city} ${order.zip}`,
-      to_email: order.email
-    }).catch(err => console.log('Email error:', err));
-  });
-
-  document.getElementById('checkoutModal').innerHTML = `
-    <div class="success-screen">
-      <div class="check">✅</div>
-      <h2>Order Placed!</h2>
-      <p>Order <strong>#${order.id}</strong> is confirmed!<br/><br/>
-      A confirmation email has been sent to <strong>${order.email}</strong>.<br/>
-      You'll receive tracking info once your order ships.</p>
-      <button onclick="closeModal()">Continue Shopping</button>
-    </div>
-  `;
-}
-
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
-}
-
-renderProducts();
-
-// ── STRIPE ──────────────────────────────────────────────
-const STRIPE_PK = 'pk_live_51TClkMC2KcEF79brcTOFtvK8wUfd6XD0UMfsjROAsEiTuFEDLSk8B6uUvo5z3ys3189af3QpewxRtmxlH3dxrKWL00mEMPNvbf';
-let stripe, stripeElements, stripeCard;
-
+// ── STRIPE ───────────────────────────────────────────────
 function loadStripe() {
   return new Promise(res => {
     if (window.Stripe) { res(); return; }
@@ -610,64 +624,60 @@ async function initStripeCard() {
   stripeCard.mount('#stripe-card-element');
   stripeCard.on('change', e => {
     const err = document.getElementById('stripe-error');
-    if (e.error) { err.textContent = e.error.message; err.style.display='block'; }
-    else { err.style.display='none'; }
+    if (e.error) { err.textContent = e.error.message; err.style.display = 'block'; }
+    else { err.style.display = 'none'; }
   });
-}
-
-// Call initStripeCard when stripe modal opens
-const _origOpenCheckout = openCheckout;
-window.openCheckout = function(method) {
-  _origOpenCheckout(method);
-  if (method === 'stripe') setTimeout(initStripeCard, 100);
-  if (method === 'paypal') setTimeout(initPayPalButtons, 100);
 }
 
 async function stripePayNow(total) {
   const btn = document.getElementById('stripe-pay-btn');
   btn.textContent = 'Processing...'; btn.disabled = true;
-  const {paymentMethod, error} = await stripe.createPaymentMethod({ type:'card', card: stripeCard });
+  const { paymentMethod, error } = await stripe.createPaymentMethod({ type: 'card', card: stripeCard });
   if (error) {
     const err = document.getElementById('stripe-error');
-    err.textContent = error.message; err.style.display='block';
-    btn.textContent = `💳 Pay $${total.toFixed(2)}`; btn.disabled=false;
+    err.textContent = error.message; err.style.display = 'block';
+    btn.textContent = '💳 Pay $' + total.toFixed(2); btn.disabled = false;
     return;
   }
-  // Payment method created — in production send paymentMethod.id to your server
-  // For now, record the order locally
   placeOrder(total);
 }
 
-// ── PAYPAL ──────────────────────────────────────────────
-const PAYPAL_CLIENT_ID = 'AR_t2-OV-UPOR-HWphxpKShqAiJkt35gOIKmmDpp82Bq8klOJtiOoDKLoHtdHkfrXTlsWAjJtsBSVUs3';
-
-function loadPayPalSDK(total) {
+// ── PAYPAL ───────────────────────────────────────────────
+function loadPayPalSDK() {
   return new Promise(res => {
     const existing = document.getElementById('paypal-sdk');
     if (existing) existing.remove();
     const s = document.createElement('script');
     s.id = 'paypal-sdk';
-    s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+    s.src = 'https://www.paypal.com/sdk/js?client-id=' + PAYPAL_CLIENT_ID + '&currency=USD';
     s.onload = res;
     document.head.appendChild(s);
   });
 }
 
 async function initPayPalButtons() {
-  const keys = Object.keys(cart).filter(k=>cart[k]>0);
+  const keys = Object.keys(cart).filter(k => cart[k] > 0);
   let total = 0;
-  keys.forEach(id=>{ const p=PRODUCTS.find(x=>x.id==id); total+=p.price*cart[id]; });
-  await loadPayPalSDK(total);
+  keys.forEach(id => { const p = PRODUCTS.find(x => x.id == id); total += p.price * cart[id]; });
+  await loadPayPalSDK();
   if (!window.paypal) return;
   const container = document.getElementById('paypal-button-container');
   if (!container) return;
   container.innerHTML = '';
   paypal.Buttons({
-    createOrder: (data, actions) => actions.order.create({ purchase_units:[{ amount:{ value: total.toFixed(2) } }] }),
-    onApprove: (data, actions) => actions.order.capture().then(() => placeOrder(total)),
-    onError: err => alert('PayPal error. Please try again.')
+    createOrder: (data, actions) => actions.order.create({ purchase_units: [{ amount: { value: total.toFixed(2) } }] }),
+    onApprove:   (data, actions) => actions.order.capture().then(() => placeOrder(total)),
+    onError:     () => alert('PayPal error. Please try again.')
   }).render('#paypal-button-container');
 }
+
+// ── UTILS ────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+renderProducts();
 </script>
 </body>
-</html>
